@@ -1,9 +1,12 @@
 package days
 
-import kotlin.math.min
 import kotlin.math.pow
 
 private typealias ButtonConnections = List<Int>
+
+private typealias SolutionVector = Map<Int, Int>
+
+private typealias Solution = Pair<SolutionVector, Int>
 
 class Day10 : Day(10) {
 
@@ -13,6 +16,8 @@ class Day10 : Day(10) {
         val buttonIndexes: List<ButtonConnections>,
         val joltageRequirements: List<Int>
     )
+
+    private data class Counter(val index: Int, val remainingCount: Int, val connectedButtons: List<Int>)
 
     override fun solvePartOne(inputString: String): Int {
         val machines: List<Machine> = parseInput(inputString)
@@ -51,7 +56,7 @@ class Day10 : Day(10) {
 
             val buttons: List<List<Int>> = parts.subList(1, parts.size - 1).map { button ->
                 trimStartAndEndChars(button).split(",").map { it.toInt() }
-            }.sortedByDescending { it.size }
+            }
             val buttonValues: List<Int> = buttons.map { button -> button.sumOf { 2.0.pow(it).toInt() } }
 
             Machine(indicatorLights, buttonValues, buttons, joltageRequirements)
@@ -62,278 +67,168 @@ class Day10 : Day(10) {
         return value.substring(1, value.length - 1)
     }
 
-
-
-
-
-//    override fun solvePartTwo(inputString: String): Any {
-//        val machines: List<Machine> = parseInput(inputString)
-//
-//        return machines.sumOf { machine ->
-//            val buttonCount: Int = machine.buttonIndexes.size
-//            val counterCount: Int = machine.joltageRequirements.size
-//            val freeVariables: Int = buttonCount - counterCount
-//
-//            val connections: MutableMap<Int, MutableList<Int>> = mutableMapOf()
-//            machine.buttonIndexes.forEachIndexed { buttonIndex, button -> button.forEach { connections.compute(it) { _, value ->
-//                val list: MutableList<Int> = (value ?: mutableListOf())
-//                list.add(buttonIndex)
-//                list
-//            } }}
-//
-//            // Get counters sorted by connected button count, and then by remaining press count within that
-//            val counters: List<Counter> = connections.entries.map { Counter(it.key, machine.joltageRequirements[it.key], it.value) }
-//                .sortedBy { it.remainingCount }
-//                .sortedBy { it.connectedButtons.size }
-//
-//
-//
-//            val machineState: MachineState = MachineState(counters, machine.buttonIndexes, listOf())
-//            val res = iterate(machineState)
-//            println(res)
-//            res
-//        }
-//    }
-//
-//    private fun getBaseSolution(counters: List<Counter>, usedButtons: List<Int>): Int {
-//        val nextCounter: Counter = counters.first { it.remainingCount > 0 }
-//        val availableButtons: List<Int> = nextCounter.connectedButtons.filter { !usedButtons.contains(it) }
-//
-//        if (availableButtons.isEmpty()) {
-//            return 100000
-//        }
-//
-//        if (availableButtons.size == 1) {
-//            val button: Int = availableButtons[0]
-//            val buttonPressCount: Int = nextCounter.remainingCount
-//
-//            val nextState: MachineState = machineState.pressButton(button, buttonPressCount)
-//            if (nextState.isCompletedState()) {
-//                return buttonPressCount
-//            }
-//            if (!nextState.isValidState()) {
-//                return 100000
-//            }
-//            return iterate(nextState) + buttonPressCount
-//        } else {
-//            for (button in availableButtons) {
-//                for (pressCount in 0..nextCounter.remainingCount) {
-//                    val nextState: MachineState = machineState.pressButton(button, pressCount)
-//                    if (nextState.isCompletedState()) {
-//                        bestResult = min(bestResult, pressCount)
-//                        continue
-//                    }
-//                    if (!nextState.isValidState()) {
-//                        if (nextState.anyCountersNegative()) {
-//                            break
-//                        }
-//                        continue
-//                    }
-//                    bestResult = min(bestResult, iterate(nextState) + pressCount)
-//                }
-//            }
-//        }
-//
-//        return bestResult
-//    }
-
-
-
-    private data class Counter(val index: Int, val remainingCount: Int, val connectedButtons: List<Int>)
-
-    private class MachineState(val counters: List<Counter>, val buttons: List<ButtonConnections>, val usedButtons: List<Int>) {
-
-        fun pressButton(buttonIndex: Int, pressCount: Int): MachineState {
-            val button: ButtonConnections = buttons[buttonIndex]
-
-            val newCounters: MutableList<Counter> = counters.map { counter ->
-                val updatedRemaining: Int = counter.remainingCount - if (button.contains(counter.index)) pressCount else 0
-                Counter(counter.index, updatedRemaining, counter.connectedButtons)
-            }.toMutableList()
-
-            val newUsedButtons: MutableSet<Int> = usedButtons.toMutableSet()
-            newUsedButtons.add(buttonIndex)
-            newCounters.filter { it.remainingCount == 0 }.forEach { newUsedButtons.addAll(it.connectedButtons) }
-
-            newCounters.sortBy { it.remainingCount }
-            newCounters.sortBy { it.connectedButtons.count { b -> !usedButtons.contains(b) } }
-
-            return MachineState(newCounters, buttons, newUsedButtons.toList())
-        }
-
-        fun isCompletedState(): Boolean {
-            return counters.all { it.remainingCount == 0 }
-        }
-
-        fun anyCountersNegative(): Boolean {
-            return counters.any { it.remainingCount < 0 }
-        }
-
-        fun isValidState(): Boolean {
-            if (anyCountersNegative()) {
-                return false
-            }
-            val allCountersReachable = counters.all { counter -> counter.remainingCount == 0 || counter.connectedButtons.any { !usedButtons.contains(it) } }
-            if (!allCountersReachable) {
-                return false
-            }
-            val remainingTargets: MutableMap<List<Int>, Int> = mutableMapOf()
-            counters.forEach { counter ->
-                val remButtons: List<Int> = counter.connectedButtons.filterNot { usedButtons.contains(it) }
-                if (remainingTargets.containsKey(remButtons) && remainingTargets[remButtons] != counter.remainingCount) {
-                    return false
-                }
-            }
-            return true
-        }
-    }
-
     override fun solvePartTwo(inputString: String): Any {
         val machines: List<Machine> = parseInput(inputString)
 
-        val sizes: Set<Pair<Int, Int>> = machines.map { Pair(it.joltageRequirements.size, it.buttonIndexes.size) }.toSet()
-
         return machines.sumOf { machine ->
-            val connections: MutableMap<Int, MutableList<Int>> = mutableMapOf()
-            machine.buttonIndexes.forEachIndexed { buttonIndex, button -> button.forEach { connections.compute(it) { _, value ->
-                val list: MutableList<Int> = (value ?: mutableListOf())
-                list.add(buttonIndex)
-                list
-            } }}
-
-            // Get counters sorted by connected button count, and then by remaining press count within that
-            val counters: List<Counter> = connections.entries.map { Counter(it.key, machine.joltageRequirements[it.key], it.value) }
-                .sortedBy { it.remainingCount }
-                .sortedBy { it.connectedButtons.size }
-
-            val machineState: MachineState = MachineState(counters, machine.buttonIndexes, listOf())
-            val res = iterate(machineState)
-            println(res)
-            res
-        }
-
-    }
-
-    private fun iterate(machineState: MachineState): Int {
-        val nextCounter: Counter = machineState.counters.first { it.remainingCount > 0 }
-        val availableButtons: List<Int> = nextCounter.connectedButtons.filter { !machineState.usedButtons.contains(it) }
-        var bestResult: Int = 100000
-
-        if (availableButtons.isEmpty()) {
-            return bestResult
-        }
-
-        if (availableButtons.size == 1) {
-            val button: Int = availableButtons[0]
-            val buttonPressCount: Int = nextCounter.remainingCount
-
-            val nextState: MachineState = machineState.pressButton(button, buttonPressCount)
-            if (nextState.isCompletedState()) {
-                return buttonPressCount
-            }
-            if (!nextState.isValidState()) {
-                return 100000
-            }
-            return iterate(nextState) + buttonPressCount
-        } else {
-            for (button in availableButtons) {
-                for (pressCount in 0..nextCounter.remainingCount) {
-                    val nextState: MachineState = machineState.pressButton(button, pressCount)
-                    if (nextState.isCompletedState()) {
-                        bestResult = min(bestResult, pressCount)
-                        continue
+            val connections: MutableMap<Int, List<Int>> = mutableMapOf()
+            machine.buttonIndexes.forEachIndexed { buttonIndex, button ->
+                button.forEach {
+                    connections.compute(it) { _, value ->
+                        (value ?: listOf()) + buttonIndex
                     }
-                    if (!nextState.isValidState()) {
-                        if (nextState.anyCountersNegative()) {
-                            break
-                        }
-                        continue
-                    }
-                    bestResult = min(bestResult, iterate(nextState) + pressCount)
                 }
             }
-        }
 
-        return bestResult
+            val counters: List<Counter> =
+                connections.entries.map { Counter(it.key, machine.joltageRequirements[it.key], it.value) }
+            val reducedCounters: List<Counter> = reduceCounters(counters)
+
+            val res: List<SolutionVector> = getSolutionVectors(reducedCounters)
+            val res2: List<Solution> = res
+                .filter { solution -> solution.entries.count { it.key < 0 && it.value == 1 } <= 1 }
+                .map { solution ->
+                    Pair(
+                        solution.filterKeys { it >= 0 },
+                        -((solution.entries.find { it.key < 0 && it.value == 1 }?.key ?: 0) + 100)
+                    )
+                }
+
+            val bestResult = findBestCombinationOfSolution(res2, reducedCounters)
+            println("$bestResult, with ${res2.size} options: $res2  ")
+            bestResult
+        }
     }
 
-//        return machines.sumOf { machine ->
-//            val connections: MutableMap<Int, MutableList<Int>> = mutableMapOf()
-//            machine.buttonIndexes.forEachIndexed { buttonIndex, button -> button.forEach { connections.compute(it) { _, value ->
-//                val list: MutableList<Int> = (value ?: mutableListOf())
-//                list.add(buttonIndex)
-//                list
-//            } }}
-//
-//            // Get counters sorted by connected button count, and then by remaining press count within that
-//            val counters: List<Counter> = connections.entries.map { Counter(it.key, machine.joltageRequirements[it.key], it.value) }
-//                .sortedBy { it.remainingCount }
-//                .sortedBy { it.connectedButtons.size }
-//
-//            iterate(counters, listOf())
-//        }
-
-    private fun tryButtonPress(machine: Machine, buttonIndex: Int, remainingCounts: List<Int>, previousBestCountRemaining: Int): Int {
-        if (remainingCounts.all { it == 0 }) {
-            // If all counts are accurate, no further presses needed
-            return 0
-        }
-        if (buttonIndex >= machine.buttonIndexes.size) {
-            // If all buttons have been pressed, return failed value
-            return 100000
-        }
-        if (remainingCounts.max() > previousBestCountRemaining) {
-            // If the remaining presses to beat the previous best is less than the remaining counts, we cannot beat it and so return
-            return 100000
-        }
-        val remainingButtonCounters: List<Int> = machine.buttonIndexes.subList(buttonIndex, machine.buttonIndexes.size).flatten()
-        if (remainingCounts.mapIndexed { index, count -> count > 0 && !remainingButtonCounters.contains(index) }.any{ it }) {
-            return 100000
-        }
-
-        var bestPressCount: Int = 100000
-        val button: List<Int> = machine.buttonIndexes[buttonIndex]
-
-        for (buttonPressAmount in remainingCounts.max() downTo 0) {
-            val nextRemainingCounts: List<Int> = remainingCounts.mapIndexed { index, count -> count - if (button.contains(index)) buttonPressAmount else 0 }
-            if (nextRemainingCounts.any { it < 0 }) {
-                // If any counts are below 0, then continue
-                continue
+    private fun reduceCounters(counters: List<Counter>): List<Counter> {
+        var hasReduction: Boolean = true
+        val updatedCounters: MutableList<Counter> = counters.toMutableList()
+        while (hasReduction) {
+            hasReduction = false
+            for (counterIndex1 in updatedCounters.indices) {
+                val counter1: Counter = updatedCounters[counterIndex1]
+                for (counterIndex2 in updatedCounters.indices) {
+                    if (counterIndex1 == counterIndex2) {
+                        continue
+                    }
+                    val counter2: Counter = updatedCounters[counterIndex2]
+                    if (counter1.connectedButtons.containsAll(counter2.connectedButtons)) {
+                        val newCounter1: Counter = Counter(
+                            counter1.index,
+                            counter1.remainingCount - counter2.remainingCount,
+                            counter1.connectedButtons - counter2.connectedButtons.toSet()
+                        )
+                        updatedCounters[counterIndex1] = newCounter1
+                        hasReduction = true
+                    }
+                }
             }
-            val pressCount: Int = tryButtonPress(machine, buttonIndex + 1, nextRemainingCounts, previousBestCountRemaining - buttonPressAmount)
-            bestPressCount = min(bestPressCount, pressCount + buttonPressAmount)
+            updatedCounters.removeIf { it.connectedButtons.isEmpty() }
         }
-        return bestPressCount
+        return updatedCounters
     }
 
-//        var currentOptions: List<List<Int>> = listOf(List(machine.joltageRequirements.size) { 0 })
-//        var buttonCount: Int = 0
-//
-//        while (currentOptions.isNotEmpty()) {
-//            buttonCount++
-//
-//            val nextOptions: MutableList<List<Int>> = mutableListOf()
-//            currentOptions.forEach { option ->
-//                machine.buttonIndexes.forEach { button ->
-//                    val nextValue: List<Int> =
-//                        option.mapIndexed { index, i -> i + if (button.contains(index)) 1 else 0 }
-//
-//                    if (nextValue == machine.joltageRequirements) {
-//                        return@sumOf buttonCount
-//                    }
-//                    if (!allButtonOptions.containsKey(nextValue)
-//                        && !nextOptions.contains(nextValue)
-//                        && nextValue.mapIndexed { index, v -> v <= machine.joltageRequirements[index] }.all { it }
-//                    ) {
-//                        allButtonOptions[nextValue] = buttonCount
-//                        nextOptions.add(nextValue)
-//                    }
-//                }
-//            }
-//            currentOptions = nextOptions //.filter { option -> !nextOptions.any { other -> other.mapIndexed { index, v -> v > option[index] }.all { it } } }
-//        }
-//
-//        return 1000000
+    private fun getSolutionVectors(counters: List<Counter>): List<Map<Int, Int>> {
+        if (counters.isEmpty()) {
+            return listOf(mapOf())
+        }
+
+        val determinedCounter: Counter? = counters.find { it.connectedButtons.size == 1 }
+
+        val buttonIndex: Int
+        val buttonPressCounts: List<Int>
+        val hasMultipleOptions: Boolean = determinedCounter == null
+
+        if (determinedCounter != null) {
+            buttonIndex = determinedCounter.connectedButtons[0]
+            buttonPressCounts = listOf(determinedCounter.remainingCount)
+        } else {
+            val counterToUse: Counter = counters[0]
+            buttonIndex = counterToUse.connectedButtons[0]
+            buttonPressCounts = listOf(0, 1)
+        }
+
+        return buttonPressCounts.flatMap { buttonPressCount ->
+            val map: Map<Int, Int> = mapOf(
+                buttonIndex to buttonPressCount,
+                -(buttonIndex + 100) to if (hasMultipleOptions) buttonPressCount else 0
+            )
+            val nextCounters: List<Counter> = updateCountersFromButtonPress(counters, buttonIndex, buttonPressCount)
+                .filterNot { it.connectedButtons.isEmpty() }
+
+            val remainingSolutions: List<Map<Int, Int>> = getSolutionVectors(reduceCounters(nextCounters))
+
+            remainingSolutions.map { it + map }
+        }
+    }
+
+    private fun updateCountersFromButtonPress(counters: List<Counter>, buttonIndex: Int, buttonPressCount: Int): List<Counter> {
+        return counters.map { counter ->
+            Counter(
+                counter.index,
+                counter.remainingCount - (if (counter.connectedButtons.contains(buttonIndex)) buttonPressCount else 0),
+                counter.connectedButtons - buttonIndex
+            )
+        }
+    }
+
+    private fun findBestCombinationOfSolution(solutionVectors: List<Solution>, reducedCounters: List<Counter>): Int {
+        val baseSolution: SolutionVector = solutionVectors[0].first
+        if (solutionVectors.size == 1) {
+            return baseSolution.values.sum()
+        }
+
+        return findBest(baseSolution.mapValues { 0 }, solutionVectors.drop(1) + solutionVectors.first(), reducedCounters)
+    }
+
+    private fun findBest(
+        baseSolution: SolutionVector,
+        remainingVectors: List<Solution>,
+        reducedCounters: List<Counter>
+    ): Int {
+        val vector: SolutionVector = remainingVectors.first().first
+        val selectedButton: Int = remainingVectors.first().second
+
+        var minSearch: Int
+        var maxSearch: Int
+
+        if (selectedButton >= 0) {
+            minSearch = 0
+            maxSearch = reducedCounters.filter { it.connectedButtons.contains(selectedButton) }.minOf { it.remainingCount }
+        } else {
+            minSearch = -5 + (vector.filter { it.value > 0 }
+                .maxOfOrNull { - (baseSolution[it.key]!! / it.value) } ?: -1000)
+            maxSearch = 5 + (vector.filter { it.value < 0 }
+                .minOfOrNull { - (baseSolution[it.key]!! / it.value) } ?: 1000)
+
+            if (vector.values.sum() > 0) {
+                maxSearch = minSearch + 10
+            } else {
+                minSearch = maxSearch - 10
+            }
+        }
+
+        return (minSearch..maxSearch).map {
+            val newSolution: SolutionVector = addVectors(baseSolution, scaleVector(vector, it))
+
+            if (remainingVectors.size == 1) {
+                if (newSolution.all {v -> v.value >= 0 } && newSolution.values.sum() > 0) {
+                    return@map newSolution.values.sum()
+                } else {
+                    return@map 100000
+                }
+            }
+            findBest(newSolution, remainingVectors.drop(1), reducedCounters)
+        }.min()
+    }
+
+    private fun addVectors(vector1: SolutionVector, vector2: SolutionVector): SolutionVector {
+        return vector1.mapValues { entry -> entry.value + (vector2[entry.key] ?: 0) }
+    }
+
+    private fun scaleVector(vector: SolutionVector, scaleFactor: Int): SolutionVector {
+        return vector.mapValues { it.value * scaleFactor }
+    }
 }
 
 fun main() {
