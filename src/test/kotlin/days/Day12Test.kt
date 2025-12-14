@@ -11,6 +11,7 @@ class Day12Test {
 
     @TestFactory
     fun testPartOneExamples() = listOf(
+        // Test case does not match
         "0:\n" +
                 "###\n" +
                 "##.\n" +
@@ -61,7 +62,7 @@ class Day12Test {
 
     @TestFactory
     fun testPartTwoExamples() = listOf(
-        "input" to 1,
+        "input" to -1,
     ).map { (input, expected) ->
         DynamicTest.dynamicTest("when input is $input then answer should be $expected") {
             val result = daySolver.solvePartTwo(input)
@@ -74,6 +75,6 @@ class Day12Test {
     fun solvePartTwo() {
         val result = daySolver.solvePartTwoFromFile()
 
-        assertEquals(1, result)
+        assertEquals(-1, result)
     }
 }

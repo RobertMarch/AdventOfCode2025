@@ -47,6 +47,7 @@ class Day12 : Day(12) {
             if (totalBoxesNeeded <= totalBoxes) {
                 return@count true
             }
+            println("Solution may or may not exist, performing full search ${region.maxX}x${region.maxY}, ${region.quantities}")
 
             val maximumEmptyCells: Int = spaceAvailable - spaceNeeded
             val res = hasSolution(CurrentState(region.points, region.quantities), region, shapes, mutableSetOf(), maximumEmptyCells)
@@ -151,6 +152,7 @@ class Day12 : Day(12) {
     }
 
     override fun solvePartTwo(inputString: String): Any {
+        // No part 2
         return -1
     }
 }
