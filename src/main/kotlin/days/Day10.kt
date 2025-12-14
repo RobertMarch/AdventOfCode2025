@@ -85,6 +85,9 @@ class Day10 : Day(10) {
             val reducedCounters: List<Counter> = reduceCounters(counters)
 
             val res: List<SolutionVector> = getSolutionVectors(reducedCounters)
+            val resTotal = res[0].values.sum()
+            println("$resTotal  ${res[0]}")
+            return@sumOf resTotal
             val res2: List<Solution> = res
                 .filter { solution -> solution.entries.count { it.key < 0 && it.value >= 1 } <= 1 }
                 .map { solution ->
@@ -187,45 +190,70 @@ class Day10 : Day(10) {
         val determinedCounter: Counter? = counters.find { it.connectedButtons.size == 1 }
 
         if (determinedCounter != null) {
-            return getSolutionsForButtonPress(counters, determinedCounter.connectedButtons[0], determinedCounter.remainingCount)
+            return getSolutionsForButtonPress(
+                counters,
+                determinedCounter.connectedButtons[0],
+                determinedCounter.remainingCount
+            )
         } else {
             val counterToUse: Counter = counters[0]
             val buttonIndex: Int = counterToUse.connectedButtons[0]
-            val results: List<List<Map<Int, Int>>> = listOf(0, 1).map { count ->
+            val maxButtonPresses: Int = counters.filter { it.connectedButtons.contains(buttonIndex) }.minOf { it.remainingCount }
+            val results: List<List<Map<Int, Int>>> = (0..maxButtonPresses).map { count ->
                 getSolutionsForButtonPress(counters, buttonIndex, count)
+            }.filterNot { it.isEmpty() }
+            if (results.isEmpty()) {
+                return results.flatten()
             }
-            if (results[0].isNotEmpty() && results[1].isNotEmpty()) {
-                // If both solutions are valid, then button can be adjusted and return values
-                return results.flatMapIndexed { index, resMap ->
-                    if (index == 0) {
-                        resMap
-                    } else {
-                        resMap.map { it + Pair(-(buttonIndex + 100), 1) }
-                    }
-                }
+            return listOf(results.flatten().minBy { it.values.sum() }) // .take(2)
+
+            val base1: Map<Int, Int> = results[0][0]
+            val base2: Map<Int, Int> = results[1][0]
+            val vector: Map<Int, Int> = base1.keys.union(base2.keys).associateWith { key ->
+                base2.getOrDefault(key, 0) - base1.getOrDefault(key, 0)
             }
 
-            // If both solutions are not valid, then button has exact required press count to be found
-            if (results[0].isNotEmpty()) {
-                return results[0]
-            }
-            if (results[1].isNotEmpty()) {
-                return results[1]
-            }
+            return results[0] + (results[1] - base2 + vector).map { it + Pair(-(buttonIndex + 100), 1) }
 
-            val r: List<Map<Int, Int>> = (2..counterToUse.remainingCount).flatMap { pressCount ->
-                getSolutionsForButtonPress(counters, buttonIndex, pressCount)
-            }.take(2)
-            if (r.size <= 1) {
-                return r
-            }
-            val base = r.first()
-            val vector = r[1].mapValues { entry -> entry.value - (base[entry.key] ?: 0) } + Pair(-(buttonIndex + 100), 2)
-            return listOf(base, vector)
+//            if (results[0].isNotEmpty() && results[1].isNotEmpty()) {
+//                // If both solutions are valid, then button can be adjusted and return values
+//                return results.flatMapIndexed { index, resMap ->
+//                    if (index == 0) {
+//                        resMap
+//                    } else {
+//                        resMap.map { it + Pair(-(buttonIndex + 100), 1) }
+//                    }
+//                }
+//            }
+//
+//            // If both solutions are not valid, then button has exact required press count to be found
+//            if (results[0].isNotEmpty()) {
+//                return results[0]
+//            }
+//            if (results[1].isNotEmpty()) {
+//                return results[1]
+//            }
+//
+//            val r: List<Map<Int, Int>> = (2..counterToUse.remainingCount).flatMap { pressCount ->
+//                getSolutionsForButtonPress(counters, buttonIndex, pressCount)
+//            }.take(2)
+//            if (r.size <= 1) {
+//                return r
+//            }
+//            val base = r.first()
+//            val vector = r[1].mapValues { entry -> entry.value - (base[entry.key] ?: 0) } + Pair(-(buttonIndex + 100), 2)
+//            return listOf(base, vector)
         }
     }
 
-    private fun getSolutionsForButtonPress(counters: List<Counter>, buttonIndex: Int, buttonPressCount: Int): List<Map<Int, Int>> {
+    private fun getSolutionsForButtonPress(
+        counters: List<Counter>,
+        buttonIndex: Int,
+        buttonPressCount: Int
+    ): List<Map<Int, Int>> {
+        if (buttonPressCount < 0) {
+            val t = 1
+        }
         val map: Map<Int, Int> = mapOf(
             buttonIndex to buttonPressCount,
         )
@@ -235,12 +263,22 @@ class Day10 : Day(10) {
             return listOf()
         }
 
-        val remainingSolutions: List<Map<Int, Int>> = getSolutionVectors(reduceCounters(nextCounters.filterNot { it.connectedButtons.isEmpty() }))
+        val reducedNextCounters: List<Counter> = reduceCounters(nextCounters.filterNot { it.connectedButtons.isEmpty() })
+
+        if (reducedNextCounters.any { (it.connectedButtons.isEmpty() && it.remainingCount != 0) || it.remainingCount < 0 }) {
+            return listOf()
+        }
+
+        val remainingSolutions: List<Map<Int, Int>> = getSolutionVectors(reducedNextCounters)
 
         return remainingSolutions.map { it + map }
     }
 
-    private fun updateCountersFromButtonPress(counters: List<Counter>, buttonIndex: Int, buttonPressCount: Int): List<Counter> {
+    private fun updateCountersFromButtonPress(
+        counters: List<Counter>,
+        buttonIndex: Int,
+        buttonPressCount: Int
+    ): List<Counter> {
         return counters.map { counter ->
             Counter(
                 counter.index,
@@ -283,12 +321,13 @@ class Day10 : Day(10) {
 
         if (selectedButton >= 0) {
             minSearch = 0
-            maxSearch = reducedCounters.filter { it.connectedButtons.contains(selectedButton) }.minOf { it.remainingCount }
+            maxSearch =
+                reducedCounters.filter { it.connectedButtons.contains(selectedButton) }.minOf { it.remainingCount }
         } else {
             minSearch = -5 + (vector.filter { it.value > 0 }
-                .maxOfOrNull { - (baseSolution[it.key]!! / it.value) } ?: -1000)
+                .maxOfOrNull { -(baseSolution[it.key]!! / it.value) } ?: -1000)
             maxSearch = 5 + (vector.filter { it.value < 0 }
-                .minOfOrNull { - (baseSolution[it.key]!! / it.value) } ?: 1000)
+                .minOfOrNull { -(baseSolution[it.key]!! / it.value) } ?: 1000)
 
             if (vector.values.sum() > 0) {
                 maxSearch = minSearch + 10
@@ -301,7 +340,7 @@ class Day10 : Day(10) {
             val newSolution: SolutionVector = addVectors(baseSolution, scaleVector(vector, it))
 
             if (remainingVectors.size == 1) {
-                if (newSolution.all {v -> v.value >= 0 } && newSolution.values.sum() > 0) {
+                if (newSolution.all { v -> v.value >= 0 } && newSolution.values.sum() > 0) {
                     return@map newSolution.values.sum()
                 } else {
                     return@map 100000
